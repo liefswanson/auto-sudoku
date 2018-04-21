@@ -52,7 +52,7 @@ class TextUI(private val solver: Solver,
             modified = solver.attemptSolveOf(board)
             state = solver.getStateOf(board)
 
-            println(board)
+            println(board.toPrettyString())
         }
 
 

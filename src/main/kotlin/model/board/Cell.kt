@@ -21,7 +21,7 @@ class Cell (
         const val UNRESOLVED = '*'
     }
 
-    override fun toString(): String =
+    fun toPrettyString(): String =
             when(possibilities.size) {
                 0 -> "$EMPTY"
                 1 -> possibilities.first().toString()

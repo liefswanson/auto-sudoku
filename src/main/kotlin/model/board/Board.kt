@@ -113,7 +113,7 @@ class Board (
         return result
     }
 
-    override fun toString(): String {
+    fun toPrettyString(): String {
         val builder = StringBuilder()
 
         for (row in 0 until size) {
@@ -148,7 +148,7 @@ class Board (
                 builder.append(VERTICAL_CHAR)
             }
 
-            builder.append( this[row,col] )
+            builder.append( this[row,col].toPrettyString() )
         }
         builder.append('\n')
     }
