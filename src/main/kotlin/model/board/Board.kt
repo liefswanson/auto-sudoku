@@ -1,8 +1,5 @@
 package model.board
 
-import com.sun.rowset.internal.Row
-import model.solver.SolveState
-
 class Board (
         private val blockSize: Int =  DEFAULT_SIZE
 ): Iterable<Cell> {
@@ -90,17 +87,22 @@ class Board (
 
     override fun iterator(): Iterator<Cell> = this.cells.iterator()
 
-    fun rows() : List<BoardPartition> = first().colCells.map { it.rowCells }
-    fun cols() : List<BoardPartition> = first().rowCells.map { it.colCells }
-    fun blocks() : List<BoardPartition> {
-        val firstCells:List<Cell> =
-                (0 until blockSize).flatMap {
-                    row -> (0 until blockSize)
-                        .map { col -> this[row*blockSize, col*blockSize] }
-                }
-
-        return firstCells.map { it.blockCells }
+    val rows: List<BoardPartition> by lazy {
+        first().colCells.map { it.rowCells }
     }
+    val cols: List<BoardPartition> by lazy {
+        first().rowCells.map { it.colCells }
+    }
+    val blocks: List<BoardPartition> by lazy {
+        topLeftCells().map { it.blockCells }
+    }
+
+    private fun topLeftCells(): BoardPartition =
+            (0 until blockSize).flatMap {
+                row -> (0 until blockSize).map {
+
+                col -> this[row*blockSize, col*blockSize]
+            }}
 
     fun copy():Board {
         val result = Board(this.blockSize)
@@ -118,10 +120,10 @@ class Board (
 
         for (row in 0 until size) {
             if (onBlockEdge(row)) {
-                appendLine(builder)
+                appendLineTo(builder)
             }
 
-            appendRow(builder, row)
+            appendRowTo(row, builder)
         }
 
         return builder.toString()
@@ -129,7 +131,7 @@ class Board (
 
     private fun onBlockEdge(i: Int): Boolean = (i % blockSize == 0) && (i != 0)
 
-    private fun appendLine(builder: StringBuilder) {
+    private fun appendLineTo(builder: StringBuilder) {
         val blockEdge = "".padStart(blockSize, HORIZONTAL_CHAR)
 
         builder.append(blockEdge)
@@ -142,7 +144,7 @@ class Board (
         builder.append('\n')
     }
 
-    private fun appendRow(builder: StringBuilder, row: Int) {
+    private fun appendRowTo(row: Int, builder: StringBuilder) {
         for (col in 0 until size) {
             if (onBlockEdge(col)) {
                 builder.append(VERTICAL_CHAR)

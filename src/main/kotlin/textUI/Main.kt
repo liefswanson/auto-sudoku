@@ -49,6 +49,11 @@ fun startSudokuFromBoard(path: String) {
         printHelpMessageAndExit()
         return
     }
+    catch (e: FileNotFoundException) {
+        println(e.message)
+        return
+    }
+
 
     startSudoku(board)
 }

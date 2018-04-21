@@ -8,9 +8,10 @@ import model.board.Cell
 
 object SimpleSolver : Solver{
     override fun attemptSolveOf(board: Board): Boolean{
-        val rows = board.rows()
-        val cols = board.cols()
-        val blocks = board.blocks()
+
+        val rows = board.rows
+        val cols = board.cols
+        val blocks = board.blocks
 
         val nakedSingles =
                 rows.solveAllNakedSingles() or
@@ -50,14 +51,14 @@ object SimpleSolver : Solver{
     override fun getStateOf(board: Board):SolveState {
 
         val parts = listOf(
-                board.rows(),
-                board.cols(),
-                board.blocks()
+                board.rows,
+                board.cols,
+                board.blocks
         ).flatten()
 
         val contradiction =
                 board.any { it.isImpossible() } ||
-                parts.evalInThreadPool({ it.containsContradiction() }, Boolean::or)
+                parts.findContradictions()
 
         return when {
             contradiction -> SolveState.Contradiction
@@ -81,6 +82,9 @@ object SimpleSolver : Solver{
 
     private fun Iterable<BoardPartition>.solveAllNakedSingles():Boolean =
             evalInThreadPool({ it.solveNakedSingles() }, Boolean::or)
+
+    private fun Iterable<BoardPartition>.findContradictions():Boolean =
+            evalInThreadPool({ it.containsContradiction() }, Boolean::or)
 
     private fun<T> Iterable<T>.evalInThreadPool(
             method: (T) -> Boolean,
