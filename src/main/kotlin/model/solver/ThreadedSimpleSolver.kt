@@ -6,7 +6,7 @@ import model.board.Board
 import model.board.BoardPartition
 import model.board.Cell
 
-object SimpleSolver : Solver{
+object ThreadedSimpleSolver : Solver{
     override fun attemptSolveOf(board: Board): Boolean{
 
         val rows = board.rows
@@ -31,9 +31,9 @@ object SimpleSolver : Solver{
     private fun performIntersection(block: BoardPartition, line: BoardPartition): Boolean {
         var modified = false
         for (i in (1 .. line.size)) {
-            val cells = block.filter { i in it }
+            val cells = block.filter { cell -> i in cell }
 
-            if (cells.all { it !in line }) {
+            if (cells.all { cell -> cell !in line }) {
                 continue
             }
 
@@ -41,7 +41,7 @@ object SimpleSolver : Solver{
             assert (targetCells.size < line.size, {"Nothing was filtered..."})
 
 
-            val removed = targetCells.evalAndAccumulateWith({ it.remove(i) }, Boolean::or)
+            val removed = targetCells.evalThenOr { it.remove(i) }
             modified = removed or modified
         }
 
@@ -50,7 +50,7 @@ object SimpleSolver : Solver{
 
     override fun getStateOf(board: Board):SolveState {
 
-        val parts = listOf(
+        val partitions = listOf(
                 board.rows,
                 board.cols,
                 board.blocks
@@ -58,58 +58,46 @@ object SimpleSolver : Solver{
 
         val contradiction =
                 board.any { it.isImpossible() } ||
-                parts.findContradictions()
+                partitions.findContradictions()
 
         return when {
             contradiction -> SolveState.Contradiction
 
-            board.all{ it.isSolved() } -> SolveState.Done
+            board.rows.isFullySolved() -> SolveState.Done
 
             else -> SolveState.InProgress
         }
     }
 
+    private fun Iterable<BoardPartition>.isFullySolved(): Boolean =
+            threadPooledAnd { part -> part.isFullySolved() }
+    private fun BoardPartition.isFullySolved(): Boolean =
+            all { cell -> cell.isSolved() }
+
     private fun BoardPartition.containsContradiction(): Boolean {
         val toCheck = this
-                .filter { it.isSolved() }
-                .map { it.onlyPossibility() }
+                .filter { cell -> cell.isSolved() }
+                .map { cell -> cell.onlyPossibility() }
 
         return toCheck.size > toCheck.toSet().size
     }
 
     private fun Iterable<BoardPartition>.solveAllHiddenSingles():Boolean =
-            evalInThreadPool({ it.solveHiddenSingles() }, Boolean::or)
+            threadPooledOr{ part -> part.solveHiddenSingles() }
 
     private fun Iterable<BoardPartition>.solveAllNakedSingles():Boolean =
-            evalInThreadPool({ it.solveNakedSingles() }, Boolean::or)
+            threadPooledOr{ part -> part.solveNakedSingles() }
 
     private fun Iterable<BoardPartition>.findContradictions():Boolean =
-            evalInThreadPool({ it.containsContradiction() }, Boolean::or)
-
-    private fun<T> Iterable<T>.evalInThreadPool(
-            method: (T) -> Boolean,
-            accumulator: Boolean.(Boolean) -> Boolean
-    ): Boolean {
-
-        val results = run {
-            this.map {
-                async { method(it) }
-            }
-        }
-
-        return runBlocking {
-            results.evalAndAccumulateWith({ it.await() }, accumulator)
-        }
-    }
+            threadPooledOr{ part -> part.containsContradiction() }
 
     private fun BoardPartition.solveNakedSingles():Boolean {
 
-        val (solved, unsolved) = this.partition { it.isSolved() }
-        val toEliminate = solved.map { it.onlyPossibility()!! } // solved, so this won't be null
+        val (solved, unsolved) = this.partition { cell -> cell.isSolved() }
+        val toEliminate = solved.map { cell -> cell.onlyPossibility()!! } // solved, so this won't be null
 
-        return unsolved.evalAndAccumulateWith({ it.removeAll(toEliminate) }, Boolean::or)
+        return unsolved.evalThenOr{ cell -> cell.removeAll(toEliminate) }
     }
-
 
     private fun BoardPartition.solveHiddenSingles():Boolean {
         val keys = (1 .. this.size)
@@ -134,7 +122,40 @@ object SimpleSolver : Solver{
         return toEliminate.isNotEmpty()
     }
 
-    private inline fun<T> Iterable<T>.evalAndAccumulateWith(predicate: (T) -> Boolean,
-                                                            accumulator: Boolean.(Boolean) -> Boolean): Boolean =
-            this.fold(false) { acc, elem -> accumulator( predicate(elem), acc) }
+    // TODO fix code duplication from requiring inline functions for await()
+    private fun<T> Iterable<T>.threadPooledOr(
+            predicate: (T) -> Boolean
+    ): Boolean {
+
+        val results = run {
+            this.map {
+                async { predicate(it) }
+            }
+        }
+
+        return runBlocking {
+            results.evalThenOr{ result -> result.await() }
+        }
+    }
+
+    private fun<T> Iterable<T>.threadPooledAnd(
+            predicate: (T) -> Boolean
+    ): Boolean {
+
+        val results = run {
+            this.map {
+                async { predicate(it) }
+            }
+        }
+
+        return runBlocking {
+            results.evalThenAnd{ result -> result.await() }
+        }
+
+    }
+
+    private inline fun<T> Iterable<T>.evalThenOr(predicate: (T) -> Boolean): Boolean =
+            fold(false) { acc, elem -> predicate(elem) or  acc }
+    private inline fun<T> Iterable<T>.evalThenAnd(predicate: (T) -> Boolean): Boolean =
+            fold(true)  { acc, elem -> predicate(elem) and acc }
 }

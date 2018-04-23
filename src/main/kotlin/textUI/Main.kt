@@ -3,7 +3,7 @@ package textUI
 import model.board.Board
 import model.board.Cell
 import model.board.InvalidBoardException
-import model.solver.SimpleSolver
+import model.solver.ThreadedSimpleSolver
 import utils.align
 import java.io.File
 import java.io.FileNotFoundException
@@ -75,7 +75,7 @@ fun startSudokuFromScratch(sizeString: String) {
 
 
 fun startSudoku(board: Board) {
-    val solver = SimpleSolver
+    val solver = ThreadedSimpleSolver
     val tui = TextUI(solver, board)
 
     while(true){

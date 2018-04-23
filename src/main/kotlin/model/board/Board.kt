@@ -7,6 +7,15 @@ class Board (
     val size = blockSize * blockSize
     val cells: Array<Cell>
         get() = field.clone()
+    val rows: List<BoardPartition> by lazy {
+        first().colCells.map { it.rowCells }
+    }
+    val cols: List<BoardPartition> by lazy {
+        first().rowCells.map { it.colCells }
+    }
+    val blocks: List<BoardPartition> by lazy {
+        topLeftCells().map { it.blockCells }
+    }
 
     companion object {
         const val DEFAULT_SIZE = 3
@@ -42,6 +51,8 @@ class Board (
             cell
         }
     }
+
+    public fun isSolved(): Boolean = all { cell -> cell.isSolved() }
 
     private fun initRows(): Array<MutableList<Cell>> = Array(size) {ArrayList<Cell>()}
     private fun initCols(): Array<MutableList<Cell>> = initRows()
@@ -85,17 +96,7 @@ class Board (
         cells[row*size + col] = elem
     }
 
-    override fun iterator(): Iterator<Cell> = this.cells.iterator()
-
-    val rows: List<BoardPartition> by lazy {
-        first().colCells.map { it.rowCells }
-    }
-    val cols: List<BoardPartition> by lazy {
-        first().rowCells.map { it.colCells }
-    }
-    val blocks: List<BoardPartition> by lazy {
-        topLeftCells().map { it.blockCells }
-    }
+    override fun iterator(): Iterator<Cell> = cells.iterator()
 
     private fun topLeftCells(): BoardPartition =
             (0 until blockSize).flatMap {
@@ -105,8 +106,8 @@ class Board (
             }}
 
     fun copy():Board {
-        val result = Board(this.blockSize)
-        val cellMap = this.cells.zip(result.cells)
+        val result = Board(blockSize)
+        val cellMap = cells.zip(result.cells)
 
         for ((source, target) in cellMap) {
             target.copyChoices(source)

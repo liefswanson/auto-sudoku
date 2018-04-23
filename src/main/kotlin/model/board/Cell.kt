@@ -1,6 +1,8 @@
 package model.board
 
-class Cell (
+import model.solver.Solver
+
+class Cell(
         val row: Int,
         val col: Int,
         val possibilities: MutableSet<Int>,
